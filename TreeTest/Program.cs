@@ -11,15 +11,43 @@ namespace TreeTest
         static void Main()
         {
             ClearAndGenerateDb();
-            Test();
+            Test1();
+            Test2();
         }
 
-        private static void Test()
+        private static void Test1()
         {
+            Console.WriteLine($"{nameof(Test1)}:");
             var db = new AppContext(ConnectionString);
             var company2 = db.Companies
-                .Include(x=>x.Childs)
+                .Include(x => x.Childs)
                 .FirstOrDefault(x => x.Name == "2");
+
+            Print(new List<Company> { company2 });
+        }
+
+        private static void Test2()
+        {
+            Console.WriteLine($"{nameof(Test2)}:");
+            var db = new AppContext(ConnectionString);
+            var companyName = "2";
+            var companies = db.Companies.FromSqlRaw(@$"
+                with recursive cte (""Id"", ""Name"", ""ParentId"") as (
+	                select c.""Id"", c.""Name"", c.""ParentId""
+	                from ""Companies"" c
+	                where c.""Name"" = '{companyName}'
+	                
+	                union all 
+	                
+	                select c.""Id"", c.""Name"", c.""ParentId""
+	                from cte as p
+	                join ""Companies"" c on p.""Id"" = c.""ParentId"" 
+	                
+                )
+
+                select * from cte;
+           ").ToList();
+            var company2 = companies.First();
             Print(new List<Company> { company2 });
         }
 
@@ -31,6 +59,7 @@ namespace TreeTest
             db.Database.EnsureCreated();
 
             var list = Generate("", 4);
+            Console.WriteLine("Generated tree:");
             Print(list);
 
             db.Companies.AddRange(list);
